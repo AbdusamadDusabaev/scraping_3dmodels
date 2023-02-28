@@ -96,7 +96,7 @@ def import_to_sql():
     print("[INFO] Создаем дамп базы данных")
     today = datetime.date.today()
     result = list()
-    path = pathlib.Path("results", f"{today}.sql")
+    path = pathlib.Path("..", "results", f"{today}.sql")
     with open(path, "w") as file:
         start_query = "DROP TABLE IF EXISTS `models`;\n" + "CREATE TABLE models (`parsing_date` VARCHAR(15), `id` INT UNIQUE,  `name` VARCHAR(200), `date` VARCHAR(20), `price` VARCHAR(50), `status` VARCHAR(20),  `amount_images` INT, `categories` VARCHAR(1000), `keywords` VARCHAR(1000),  `description` TEXT, `native` VARCHAR(200), `formats` VARCHAR(1500), `polygons` INT,  `vertices` INT, `stem_cell` VARCHAR(1), `check_mate_pro` VARCHAR(1),  `check_mate_lite` VARCHAR(1), `author` VARCHAR(50),  `date_registration` VARCHAR(20), `place` INT);\n"
         file.write(start_query)
