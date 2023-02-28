@@ -4,18 +4,32 @@ import requests
 from bs4 import BeautifulSoup
 from database import record_model, all_offline, import_to_sql
 
-
 ua_chrome = " ".join(["Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
                       "AppleWebKit/537.36 (KHTML, like Gecko)",
                       "Chrome/108.0.0.0 Safari/537.36"])
 headers = {"user-agent": ua_chrome}
 
 
+def auto_import_to_sql():
+    while True:
+        time.sleep(1800)
+        with open("check_tasks.txt", "r", encoding="utf-8") as file:
+            content = file.read()
+        check = True
+        for index in range(1, 21):
+            if not (f"OK-{index}" in content):
+                check = False
+                break
+        if check:
+            import_to_sql()
+            with open("check_tasks.txt", "w", encoding="utf-8") as file:
+                file.write("")
+
+
 def get_product_info(session, product_link, place):
     response = session.get(url=product_link, headers=headers)
     bs_object = BeautifulSoup(response.content, "lxml")
     name = bs_object.h1.text.strip().replace('"', "'")
-    print(f"[INFO] Записываем модель {name} ({product_link}) в базу данных")
     date = bs_object.find(name="time", itemprop="datePublished").text.strip().replace('"', "'")
     model_id = bs_object.find(name="span", id="ProductID").text.strip()
     if len(model_id) == 0 or model_id is None:
@@ -85,11 +99,20 @@ def get_product_links_from_page(page, place, session):
     product_links = bs_object.find_all(name="a", class_="mouseover_fplink")
     for product_link in product_links:
         place += 1
-        get_product_info(product_link=product_link["href"], place=place, session=session)
+        try:
+            get_product_info(product_link=product_link["href"], place=place, session=session)
+        except Exception as ex:
+            print(f"[ERROR] {ex}")
+            continue
 
 
-def main():
-    print("[INFO] Программа запущена")
+def record_finish_flag(task_id):
+    with open("finish-flag.txt", "a", encoding="utf-8", newline="\n") as file:
+        file.write(f"OK-{task_id}")
+
+
+def task(task_id):
+    print(f"[INFO] Задача {task_id} запущена")
     session = requests.Session()
     while True:
         start_time = time.time()
@@ -98,18 +121,31 @@ def main():
         response = session.get(url=url, headers=headers)
         bs_object = BeautifulSoup(response.content, "lxml")
         amount_pages = int(bs_object.find(name="span", id="ts-total-pages").text.strip())
-        place = 0
-        for page in range(1, amount_pages + 1):
+        step_amount_pages = amount_pages // 20
+        start_step = (task_id - 1) * step_amount_pages + 1
+        stop_step = task_id * step_amount_pages + 1
+        place = (start_step - 1) * 100
+        for page in range(start_step, stop_step):
             print(f"[INFO] Собираем ссылки на модели со страницы {page}")
             start = time.time()
-            get_product_links_from_page(page=page, place=place, session=session)
-            place += 100
+            try:
+                get_product_links_from_page(page=page, place=place, session=session)
+                place += 100
+            except Exception as ex:
+                print(f"[ERROR] {ex}")
+                continue
             print(f"[TIME] Сбор 100 записей прошел за {time.time() - start}")
-        import_to_sql()
+            print(f"[TIME] Собрано {page * 100} записей")
+        record_finish_flag(task_id=task_id)
         stop_time = time.time()
-        print("[INFO] Программа завершена")
-        print(f"[INFO] Время работы программы: {stop_time - start_time}")
+        print(f"[INFO] Задача {task_id} завершена")
+        print(f"[INFO] Время работы задачи: {stop_time - start_time}")
 
 
-if __name__ == "__main__":
-    main()
+def run_task(task_id):
+    while True:
+        time.sleep(600)
+        with open("check_tasks.txt", "r", encoding="utf-8") as file:
+            content = file.read()
+        if not (f"OK-{task_id}" in content):
+            task(task_id=task_id)

@@ -131,6 +131,8 @@ def import_to_sql():
     with open(path, "a") as file:
         file.write(result)
     print(f"[INFO] Дамп базы данных успешно создан: {datetime.date.today()}")
+    database(query="DELETE FROM models;")
+    print("[INFO] База данных очищена")
 
 
 if __name__ == "__main__":
